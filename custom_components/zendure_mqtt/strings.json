@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Zendure MQTT",
+        "description": "Set up your Zendure device with MQTT",
+        "data": {
+          "mqtt_host": "MQTT Broker IP Address",
+          "mqtt_port": "MQTT Broker Port",
+          "mqtt_username": "MQTT Username (optional)",
+          "mqtt_password": "MQTT Password (optional)",
+          "device_model": "Device Model"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to MQTT broker. Please check your settings.",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  }
+}

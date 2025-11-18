@@ -2,12 +2,16 @@
 import logging
 from typing import Any
 
-import paho.mqtt.client as mqtt
 import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+
+try:
+    import paho.mqtt.client as mqtt
+except ImportError:
+    mqtt = None
 
 from .const import (
     CONF_DEVICE_ID,
@@ -28,6 +32,10 @@ def validate_mqtt_connection(
     host: str, port: int, username: str | None, password: str | None
 ) -> bool:
     """Validate the MQTT connection."""
+    if mqtt is None:
+        _LOGGER.error("paho-mqtt library is not installed")
+        return False
+
     try:
         client = mqtt.Client()
 

@@ -2,7 +2,10 @@
 import logging
 from typing import Any
 
-import paho.mqtt.client as mqtt
+try:
+    import paho.mqtt.client as mqtt
+except ImportError:
+    mqtt = None
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -41,6 +44,10 @@ async def async_setup_entry(
 
     # Get the product ID for the device model
     product_id = DEVICE_PRODUCT_IDS.get(device_model)
+
+    if mqtt is None:
+        _LOGGER.error("paho-mqtt library is not installed")
+        return
 
     # Create MQTT client
     mqtt_client = mqtt.Client()

@@ -10,6 +10,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import (
+    CONF_DEVICE_ID,
     CONF_DEVICE_MODEL,
     CONF_MQTT_HOST,
     CONF_MQTT_PASSWORD,
@@ -76,16 +77,21 @@ class ZendureMqttConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if not is_valid:
                     errors["base"] = "cannot_connect"
                 else:
-                    # Create a unique ID based on the MQTT host and device model
-                    await self.async_set_unique_id(
-                        f"{mqtt_host}_{user_input[CONF_DEVICE_MODEL]}"
-                    )
-                    self._abort_if_unique_id_configured()
+                    # Validate device ID is not empty
+                    device_id = user_input.get(CONF_DEVICE_ID, "").strip()
+                    if not device_id:
+                        errors["base"] = "invalid_device_id"
+                    else:
+                        # Create a unique ID based on the device ID and model
+                        await self.async_set_unique_id(
+                            f"{device_id}_{user_input[CONF_DEVICE_MODEL]}"
+                        )
+                        self._abort_if_unique_id_configured()
 
-                    return self.async_create_entry(
-                        title=f"Zendure {user_input[CONF_DEVICE_MODEL].upper()}",
-                        data=user_input,
-                    )
+                        return self.async_create_entry(
+                            title=f"Zendure {user_input[CONF_DEVICE_MODEL].upper()} ({device_id})",
+                            data=user_input,
+                        )
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
@@ -98,6 +104,7 @@ class ZendureMqttConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_MQTT_USERNAME, default=""): str,
                 vol.Optional(CONF_MQTT_PASSWORD, default=""): str,
                 vol.Required(CONF_DEVICE_MODEL): vol.In(DEVICE_MODELS),
+                vol.Required(CONF_DEVICE_ID): str,
             }
         )
 

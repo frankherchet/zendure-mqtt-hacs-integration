@@ -10,14 +10,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    CONF_DEVICE_ID,
     CONF_DEVICE_MODEL,
     CONF_MQTT_HOST,
     CONF_MQTT_PASSWORD,
     CONF_MQTT_PORT,
     CONF_MQTT_USERNAME,
     DEFAULT_MQTT_PORT,
+    DEVICE_PRODUCT_IDS,
     DOMAIN,
-    TOPIC_PREFIX,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,6 +37,10 @@ async def async_setup_entry(
     mqtt_username = config.get(CONF_MQTT_USERNAME)
     mqtt_password = config.get(CONF_MQTT_PASSWORD)
     device_model = config[CONF_DEVICE_MODEL]
+    device_id = config[CONF_DEVICE_ID]
+
+    # Get the product ID for the device model
+    product_id = DEVICE_PRODUCT_IDS.get(device_model)
 
     # Create MQTT client
     mqtt_client = mqtt.Client()
@@ -51,6 +56,8 @@ async def async_setup_entry(
         mqtt_host,
         mqtt_port,
         device_model,
+        device_id,
+        product_id,
         config_entry.entry_id,
     )
 
@@ -66,6 +73,8 @@ class ZendureMqttSensor(SensorEntity):
         mqtt_host: str,
         mqtt_port: int,
         device_model: str,
+        device_id: str,
+        product_id: str,
         entry_id: str,
     ) -> None:
         """Initialize the sensor."""
@@ -73,8 +82,10 @@ class ZendureMqttSensor(SensorEntity):
         self._mqtt_host = mqtt_host
         self._mqtt_port = mqtt_port
         self._device_model = device_model
+        self._device_id = device_id
+        self._product_id = product_id
         self._entry_id = entry_id
-        self._attr_name = f"Zendure {device_model.upper()}"
+        self._attr_name = f"Zendure {device_model.upper()} ({device_id})"
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_sensor"
         self._state = None
         self._available = False
@@ -90,10 +101,15 @@ class ZendureMqttSensor(SensorEntity):
         if rc == 0:
             _LOGGER.info("Connected to MQTT broker")
             self._available = True
-            # Subscribe to device topics
-            topic = f"{TOPIC_PREFIX}/{self._device_model}/#"
+            # Subscribe to device report topic
+            topic = f"/{self._product_id}/{self._device_id}/properties/report"
             client.subscribe(topic)
             _LOGGER.info("Subscribed to topic: %s", topic)
+
+            # Also subscribe to all device topics for compatibility
+            wildcard_topic = f"/{self._product_id}/{self._device_id}/#"
+            client.subscribe(wildcard_topic)
+            _LOGGER.info("Subscribed to wildcard topic: %s", wildcard_topic)
         else:
             _LOGGER.error("Failed to connect to MQTT broker with code: %s", rc)
             self._available = False
@@ -159,16 +175,24 @@ class ZendureMqttSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the state attributes."""
-        return self._attributes
+        attributes = {
+            "device_id": self._device_id,
+            "product_id": self._product_id,
+            "device_model": self._device_model,
+        }
+        # Add all received MQTT topics as attributes
+        attributes.update(self._attributes)
+        return attributes
 
     @property
     def device_info(self) -> dict[str, Any]:
         """Return device information."""
         return {
-            "identifiers": {(DOMAIN, self._entry_id)},
-            "name": f"Zendure {self._device_model.upper()}",
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": f"Zendure {self._device_model.upper()} ({self._device_id})",
             "manufacturer": "Zendure",
             "model": self._device_model.upper(),
+            "sw_version": self._product_id,
         }
 
     def publish_mqtt(self, topic: str, payload: str) -> bool:

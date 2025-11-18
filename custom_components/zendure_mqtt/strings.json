@@ -9,12 +9,14 @@
           "mqtt_port": "MQTT Broker Port",
           "mqtt_username": "MQTT Username (optional)",
           "mqtt_password": "MQTT Password (optional)",
-          "device_model": "Device Model"
+          "device_model": "Device Model",
+          "device_id": "Device ID"
         }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect to MQTT broker. Please check your settings.",
+      "invalid_device_id": "Device ID cannot be empty. Please enter a valid device ID.",
       "unknown": "Unexpected error occurred"
     },
     "abort": {

@@ -48,25 +48,41 @@ A Home Assistant Custom Component (HACS) for integrating Zendure devices via MQT
    - **MQTT Username**: Username for authentication (optional, can be left empty)
    - **MQTT Password**: Password for authentication (optional, can be left empty)
    - **Device Model**: Select your Zendure device model from the dropdown
+   - **Device ID**: Enter your device's unique identifier
+
+## Device Model to Product ID Mapping
+
+The integration automatically maps device models to their product IDs:
+
+| Device Model | Product ID |
+|--------------|------------|
+| hub1200      | 73bkTV     |
+| hub2000      | A8yh63     |
+| aio2400      | yWF7hV     |
+| ace1500      | 8bM93H     |
+| hyper2000    | gDa3tb     |
 
 ## MQTT Topics
 
 The integration subscribes to topics following the pattern:
 ```
-zendure/{device_model}/#
+/{product_id}/{device_id}/properties/report
+/{product_id}/{device_id}/#
 ```
 
-For example, for a HUB1200 device:
+For example, for a HUB1200 device with device ID "ABC123":
 ```
-zendure/hub1200/#
+/73bkTV/ABC123/properties/report
+/73bkTV/ABC123/#
 ```
 
 ## Usage
 
 Once configured, the integration will:
 - Create a sensor entity for your Zendure device
-- Subscribe to relevant MQTT topics
+- Subscribe to relevant MQTT topics based on product ID and device ID
 - Display received data as sensor states and attributes
+- Expose device ID and product ID as attributes
 - Allow publishing messages to MQTT topics (via services or automation)
 
 ### Example Automation

@@ -30,7 +30,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up Zendure MQTT sensor based on a config entry."""
     config = hass.data[DOMAIN][config_entry.entry_id]
-    
+
     mqtt_host = config[CONF_MQTT_HOST]
     mqtt_port = config.get(CONF_MQTT_PORT, DEFAULT_MQTT_PORT)
     mqtt_username = config.get(CONF_MQTT_USERNAME)
@@ -39,7 +39,7 @@ async def async_setup_entry(
 
     # Create MQTT client
     mqtt_client = mqtt.Client()
-    
+
     if mqtt_username and mqtt_password:
         mqtt_client.username_pw_set(mqtt_username, mqtt_password)
     elif mqtt_username:
@@ -104,11 +104,11 @@ class ZendureMqttSensor(SensorEntity):
             topic = msg.topic
             payload = msg.payload.decode("utf-8")
             _LOGGER.debug("Received message on topic %s: %s", topic, payload)
-            
+
             # Store the latest message as state
             self._state = payload
             self._attributes[topic] = payload
-            
+
             # Schedule an update
             if self.hass:
                 self.schedule_update_ha_state()
@@ -123,7 +123,7 @@ class ZendureMqttSensor(SensorEntity):
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
         await super().async_added_to_hass()
-        
+
         # Connect to MQTT broker
         try:
             await self.hass.async_add_executor_job(
@@ -137,7 +137,7 @@ class ZendureMqttSensor(SensorEntity):
     async def async_will_remove_from_hass(self) -> None:
         """Run when entity will be removed from hass."""
         await super().async_will_remove_from_hass()
-        
+
         # Disconnect from MQTT broker
         try:
             await self.hass.async_add_executor_job(self._mqtt_client.loop_stop)

@@ -6,7 +6,6 @@ import paho.mqtt.client as mqtt
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
@@ -30,12 +29,12 @@ def validate_mqtt_connection(
     """Validate the MQTT connection."""
     try:
         client = mqtt.Client()
-        
+
         if username and password:
             client.username_pw_set(username, password)
         elif username:
             client.username_pw_set(username)
-        
+
         client.connect(host, port, 10)
         client.loop_start()
         client.loop_stop()

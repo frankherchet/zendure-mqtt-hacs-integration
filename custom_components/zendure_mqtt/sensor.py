@@ -106,6 +106,11 @@ class ZendureMqttSensor(SensorEntity):
             client.subscribe(topic)
             _LOGGER.info("Subscribed to topic: %s", topic)
 
+            # Subscribe to write reply topic for command responses
+            write_reply_topic = f"/{self._product_id}/{self._device_id}/properties/write/reply"
+            client.subscribe(write_reply_topic)
+            _LOGGER.info("Subscribed to write reply topic: %s", write_reply_topic)
+
             # Also subscribe to all device topics for compatibility
             wildcard_topic = f"/{self._product_id}/{self._device_id}/#"
             client.subscribe(wildcard_topic)
@@ -121,9 +126,83 @@ class ZendureMqttSensor(SensorEntity):
             payload = msg.payload.decode("utf-8")
             _LOGGER.debug("Received message on topic %s: %s", topic, payload)
 
-            # Store the latest message as state
-            self._state = payload
-            self._attributes[topic] = payload
+            # Try to parse JSON payload
+            try:
+                import json
+                from .properties import DEVICE_PROPERTIES, PACK_PROPERTIES, apply_conversion
+                
+                data = json.loads(payload)
+                
+                # Extract main fields
+                if "messageId" in data:
+                    self._attributes["messageId"] = data["messageId"]
+                if "product" in data:
+                    self._attributes["product"] = data["product"]
+                if "deviceId" in data:
+                    self._attributes["deviceId"] = data["deviceId"]
+                if "timestamp" in data:
+                    self._attributes["timestamp"] = data["timestamp"]
+                
+                # Parse device properties
+                if "properties" in data and isinstance(data["properties"], dict):
+                    for prop_key, prop_value in data["properties"].items():
+                        if prop_key in DEVICE_PROPERTIES:
+                            prop_def = DEVICE_PROPERTIES[prop_key]
+                            # Apply conversion if specified
+                            converted_value = apply_conversion(prop_value, prop_def["conversion"])
+                            self._attributes[prop_key] = converted_value
+                        else:
+                            # Store unknown properties as-is
+                            self._attributes[prop_key] = prop_value
+                
+                # Parse battery pack data
+                if "packData" in data and isinstance(data["packData"], list):
+                    self._attributes["pack_count"] = len(data["packData"])
+                    for pack_idx, pack in enumerate(data["packData"]):
+                        if isinstance(pack, dict) and "sn" in pack:
+                            pack_sn = pack["sn"]
+                            pack_prefix = f"pack_{pack_sn}"
+                            
+                            # Store pack serial number
+                            self._attributes[f"{pack_prefix}_sn"] = pack_sn
+                            
+                            # Parse pack properties
+                            for pack_prop_key, pack_prop_value in pack.items():
+                                if pack_prop_key == "sn":
+                                    continue  # Already stored
+                                
+                                if pack_prop_key in PACK_PROPERTIES:
+                                    pack_prop_def = PACK_PROPERTIES[pack_prop_key]
+                                    # Apply conversion if specified
+                                    converted_value = apply_conversion(
+                                        pack_prop_value, 
+                                        pack_prop_def["conversion"]
+                                    )
+                                    self._attributes[f"{pack_prefix}_{pack_prop_key}"] = converted_value
+                                else:
+                                    # Store unknown pack properties as-is
+                                    self._attributes[f"{pack_prefix}_{pack_prop_key}"] = pack_prop_value
+                
+                # Set state to a summary or status if available
+                if "properties" in data and isinstance(data["properties"], dict):
+                    # Use electricLevel (battery level) as state if available
+                    if "electricLevel" in data["properties"]:
+                        self._state = str(data["properties"]["electricLevel"])
+                    # Otherwise use packState
+                    elif "packState" in data["properties"]:
+                        pack_state = data["properties"]["packState"]
+                        state_map = {0: "idle", 1: "charging", 2: "discharging"}
+                        self._state = state_map.get(pack_state, str(pack_state))
+                    else:
+                        self._state = "online"
+                else:
+                    self._state = "online"
+                    
+            except json.JSONDecodeError:
+                # Not JSON, store as raw payload
+                _LOGGER.debug("Payload is not JSON, storing as raw")
+                self._state = payload
+                self._attributes[topic] = payload
 
             # Schedule an update
             if self.hass:
@@ -202,4 +281,41 @@ class ZendureMqttSensor(SensorEntity):
             return result.rc == mqtt.MQTT_ERR_SUCCESS
         except Exception as err:
             _LOGGER.error("Failed to publish MQTT message: %s", err)
+            return False
+
+    def write_property(self, properties: dict[str, Any]) -> bool:
+        """Write properties to device using the command topic.
+        
+        Args:
+            properties: Dictionary of property names and values to write
+            
+        Returns:
+            True if message was published successfully
+            
+        Example:
+            sensor.write_property({"outputLimit": 1000, "socSet": 900})
+        """
+        import json
+        
+        try:
+            # Build command topic
+            command_topic = f"iot/{self._product_id}/{self._device_id}/properties/write"
+            
+            # Build payload with properties
+            payload = {
+                "properties": properties
+            }
+            
+            # Publish command
+            result = self._mqtt_client.publish(command_topic, json.dumps(payload))
+            
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                _LOGGER.info("Published write command to %s: %s", command_topic, properties)
+                return True
+            else:
+                _LOGGER.error("Failed to publish write command, rc=%s", result.rc)
+                return False
+                
+        except Exception as err:
+            _LOGGER.error("Failed to write property: %s", err)
             return False

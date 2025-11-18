@@ -40,3 +40,5 @@ DEVICE_PRODUCT_IDS = {
 # MQTT Topics
 TOPIC_PREFIX = "zendure"
 MQTT_TOPIC_REPORT = "/{product_id}/{device_id}/properties/report"
+MQTT_TOPIC_WRITE = "iot/{product_id}/{device_id}/properties/write"
+MQTT_TOPIC_WRITE_REPLY = "/{product_id}/{device_id}/properties/write/reply"

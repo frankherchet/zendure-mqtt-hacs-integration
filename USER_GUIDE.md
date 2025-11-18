@@ -48,11 +48,14 @@ You'll see a form with the following fields:
 │                                             │
 │  Device Model: [▼ Select model]            │
 │  Options:                                   │
-│    - hub1200                                │
-│    - hub2000                                │
-│    - aio2400                                │
-│    - ace1500                                │
-│    - hyper2000                              │
+│    - hub1200     (Product ID: 73bkTV)      │
+│    - hub2000     (Product ID: A8yh63)      │
+│    - aio2400     (Product ID: yWF7hV)      │
+│    - ace1500     (Product ID: 8bM93H)      │
+│    - hyper2000   (Product ID: gDa3tb)      │
+│                                             │
+│  Device ID: [____________]                  │
+│  Required (Your device's unique ID)         │
 │                                             │
 │  [Cancel]              [Submit]             │
 └─────────────────────────────────────────────┘
@@ -62,12 +65,14 @@ You'll see a form with the following fields:
 The integration will:
 - Test the MQTT broker connection
 - Validate credentials (if provided)
-- Show error if connection fails
+- Validate device ID is not empty
+- Show error if connection fails or device ID is invalid
 - Create the integration if successful
 
 ### Possible Error Messages
 - **"Failed to connect to MQTT broker"** - Check IP address, port, and that broker is running
-- **"Device is already configured"** - This device model with this broker is already set up
+- **"Device ID cannot be empty"** - You must enter a valid device ID
+- **"Device is already configured"** - This device ID and model combination is already set up
 
 ## Post-Configuration Experience
 
@@ -75,23 +80,28 @@ The integration will:
 After successful configuration, you'll see:
 
 **Device Information:**
-- Name: "Zendure HUB1200" (or your selected model)
+- Name: "Zendure HUB1200 (ABC123)" (includes device ID)
 - Manufacturer: Zendure
 - Model: HUB1200 (uppercase)
+- Software Version: 73bkTV (Product ID)
 
 **Entity Created:**
-- Entity ID: `sensor.zendure_hub1200`
+- Entity ID: `sensor.zendure_hub1200_abc123`
 - State: Shows latest MQTT message
-- Attributes: All received MQTT topics and their values
+- Attributes: Device ID, Product ID, and all received MQTT topics
 
 ### Example Entity State
 ```yaml
 state: "online"
 attributes:
-  zendure/hub1200/status: "online"
-  zendure/hub1200/battery/level: "85"
-  zendure/hub1200/power/output: "120"
-  friendly_name: "Zendure HUB1200"
+  device_id: "ABC123"
+  product_id: "73bkTV"
+  device_model: "hub1200"
+  /73bkTV/ABC123/properties/report: "{...json data...}"
+  /73bkTV/ABC123/status: "online"
+  /73bkTV/ABC123/battery/level: "85"
+  /73bkTV/ABC123/power/output: "120"
+  friendly_name: "Zendure HUB1200 (ABC123)"
 ```
 
 ## Using the Integration
@@ -102,7 +112,7 @@ Add a card to monitor your device:
 ```yaml
 type: entities
 entities:
-  - entity: sensor.zendure_hub1200
+  - entity: sensor.zendure_hub1200_abc123
 title: My Zendure Device
 ```
 
@@ -114,10 +124,10 @@ automation:
   - alias: "Low Battery Alert"
     trigger:
       - platform: state
-        entity_id: sensor.zendure_hub1200
+        entity_id: sensor.zendure_hub1200_abc123
     condition:
       - condition: template
-        value_template: "{{ state_attr('sensor.zendure_hub1200', 'zendure/hub1200/battery/level') | int < 20 }}"
+        value_template: "{{ state_attr('sensor.zendure_hub1200_abc123', '/73bkTV/ABC123/battery/level') | int < 20 }}"
     action:
       - service: notify.mobile_app
         data:
@@ -126,23 +136,25 @@ automation:
 
 ### Viewing MQTT Topics
 All subscribed topics appear as attributes on the sensor entity. You can view them in:
-- Developer Tools → States → `sensor.zendure_hub1200`
+- Developer Tools → States → `sensor.zendure_hub1200_abc123`
 
 ## MQTT Topic Pattern
 
 The integration subscribes to:
 ```
-zendure/{device_model}/#
+/{product_id}/{device_id}/properties/report
+/{product_id}/{device_id}/#
 ```
 
 Where `#` is a wildcard matching all sub-topics.
 
-**Examples:**
-- `zendure/hub1200/status`
-- `zendure/hub1200/battery/level`
-- `zendure/hub1200/battery/voltage`
-- `zendure/hub1200/power/input`
-- `zendure/hub1200/power/output`
+**Examples for HUB1200 with device ID "ABC123":**
+- `/73bkTV/ABC123/properties/report` (main status topic)
+- `/73bkTV/ABC123/status`
+- `/73bkTV/ABC123/battery/level`
+- `/73bkTV/ABC123/battery/voltage`
+- `/73bkTV/ABC123/power/input`
+- `/73bkTV/ABC123/power/output`
 
 ## Writing to MQTT Topics
 
@@ -157,7 +169,8 @@ While the sensor entity subscribes to read topics, the component includes publis
 
 ### No Data Received
 - Verify your Zendure device is publishing to MQTT
-- Check the expected topic pattern: `zendure/{device_model}/#`
+- Check the expected topic pattern: `/{product_id}/{device_id}/properties/report`
+- Verify you entered the correct device ID during setup
 - Use an MQTT client (like MQTT Explorer) to verify messages are being published
 - Check Home Assistant logs for connection issues
 

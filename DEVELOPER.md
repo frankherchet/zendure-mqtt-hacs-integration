@@ -40,8 +40,8 @@ Implements the MQTT sensor with:
 Defines:
 - Domain identifier: `zendure_mqtt`
 - Configuration keys
-- Supported device models
-- MQTT topic prefix
+- Supported device models with product ID mappings
+- MQTT topic patterns
 
 ## Configuration Parameters
 
@@ -52,48 +52,67 @@ Defines:
 | `mqtt_username` | string | No | "" | MQTT username (optional) |
 | `mqtt_password` | string | No | "" | MQTT password (optional) |
 | `device_model` | string | Yes | - | Device model selection |
+| `device_id` | string | Yes | - | Unique device identifier |
 
 ## Supported Device Models
 
-1. **hub1200** - HUB1200
-2. **hub2000** - HUB2000
-3. **aio2400** - AIO2400
-4. **ace1500** - ACE1500
-5. **hyper2000** - HYPER2000
+Each device model is mapped to a specific product ID:
+
+1. **hub1200** - HUB1200 (Product ID: 73bkTV)
+2. **hub2000** - HUB2000 (Product ID: A8yh63)
+3. **aio2400** - AIO2400 (Product ID: yWF7hV)
+4. **ace1500** - ACE1500 (Product ID: 8bM93H)
+5. **hyper2000** - HYPER2000 (Product ID: gDa3tb)
 
 ## MQTT Topics
 
-The component subscribes to all topics under:
+The component subscribes to topics using the product ID and device ID:
+
+**Main report topic:**
 ```
-zendure/{device_model}/#
+/{product_id}/{device_id}/properties/report
 ```
 
-Examples:
-- `zendure/hub1200/status`
-- `zendure/hub1200/battery/level`
-- `zendure/hub2000/power/output`
+**Wildcard subscription:**
+```
+/{product_id}/{device_id}/#
+```
+
+Examples for a HUB1200 device with device ID "ABC123":
+- `/73bkTV/ABC123/properties/report`
+- `/73bkTV/ABC123/status`
+- `/73bkTV/ABC123/battery/level`
+- `/73bkTV/ABC123/power/output`
 
 ## Entity Naming
 
 Entities are named using the pattern:
 ```
-sensor.zendure_{device_model}
+sensor.zendure_{device_model}_{sanitized_device_id}
 ```
 
-Example: `sensor.zendure_hub1200`
+The friendly name includes the device ID:
+```
+Zendure HUB1200 (ABC123)
+```
 
 ## Device Information
 
 Each configured device exposes:
-- **Identifiers**: Unique identifier based on entry ID
-- **Name**: "Zendure {MODEL}"
+- **Identifiers**: Unique identifier based on device ID
+- **Name**: "Zendure {MODEL} ({device_id})"
 - **Manufacturer**: "Zendure"
 - **Model**: Device model in uppercase
+- **Software Version**: Product ID
 
 ## State and Attributes
 
 - **State**: Latest received MQTT message payload
-- **Attributes**: All received MQTT topics and their values
+- **Attributes**: 
+  - `device_id`: The configured device ID
+  - `product_id`: The product ID for the device model
+  - `device_model`: The device model
+  - All received MQTT topics and their values
 
 ## Publishing Messages
 
